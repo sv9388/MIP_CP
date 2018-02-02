@@ -1,4 +1,3 @@
--f /usr/share/pip-wheels
 numpy==1.14.0
 ortools==6.6.4656
 pandas==0.22.0
