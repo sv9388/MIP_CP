@@ -1,8 +1,11 @@
 import pandas as pd
 from ortools.constraint_solver import pywrapcp
 
+
+BREAK_UNIT = 1 #TODO: Six units in actual file
+
 def get_df():
-  section_df = pd.read_csv('./sections.csv')
+  section_df = pd.read_csv('./sections.csv') #TODO: Dynamic filenames as ip
   employees_df = pd.read_csv('./employees.csv')
   return section_df, employees_df
 
@@ -65,9 +68,14 @@ def get_optimized_answer(sections_df, employees_df):
       min_val = temp_arr[j][k]
       solver.Add(solver.Sum([ sections[(i,j)] == k+1 for i in range(employee_count)]) >= int(min_val))
   #7. Break can be only after 3rd hour and before 3rd hour at end. every employee 
-  _ = """for i in range(employee_count):
-    solver.Add(solver.Sum([sections[(i, j)] != 0 for j in range(6)]) == 0)
-    solver.Add(solver.Sum([sections[(i, j)] != 0 for j in range(hours_count - 6, hours_count)]) == 0)"""
+  for i in range(employee_count):
+    pref_start = employees_df.loc[i]['preferredstart']
+    print(pref_start)
+    pref_start_idx = sections_df[sections_df['time'] == pref_start].index[0]
+    pref_end = employees_df.loc[i]['preferredend']
+    pref_end_idx = sections_df[sections_df['time'] == pref_end].index[0]
+    solver.Add(solver.Sum([sections[(i, j)] == 0 for j in range(pref_start_idx, pref_start_idx + BREAK_UNIT)]) == 0)
+    solver.Add(solver.Sum([sections[(i, j)] == 0 for j in range(pref_end_idx - BREAK_UNIT, pref_end_idx)]) == 0)
   #8. Run optimizer
   print("Phasing", solver)
   db = solver.Phase(sections_flat, solver.CHOOSE_FIRST_UNBOUND, solver.ASSIGN_MIN_VALUE)
@@ -84,7 +92,10 @@ def get_optimized_answer(sections_df, employees_df):
   for sol in range(collector.SolutionCount()):
     print("Solution number" , sol, '\n')
     op = [[collector.Value(sol, sections[(j, i)]) for j in range(employee_count)] for i in range(hours_count)]
-    print(op) #"Employee", j, "assigned to task",  collector.Value(sol, sections[(j, i)]))
+    opindex =  [sections_df.loc[i].time for i in range(hours_count)]
+    opdf = pd.DataFrame(op, index = opindex)
+    opdf.columns = [employees_df.loc[i].employeeid for i in range(employee_count)]
+    print(opdf) #"Employee", j, "assigned to task",  collector.Value(sol, sections[(j, i)]))
  
 
 def main():
