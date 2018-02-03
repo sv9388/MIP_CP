@@ -1,7 +1,7 @@
 import pandas as pd
 from ortools.constraint_solver import pywrapcp
 
-
+MAX_BREAKS = 1 #TODO: 2
 BREAK_UNIT = 1 #TODO: Six units in actual file
 
 def get_df():
@@ -67,7 +67,8 @@ def get_optimized_answer(sections_df, employees_df):
     for k in range(temp_arr.shape[1]):
       min_val = temp_arr[j][k]
       solver.Add(solver.Sum([ sections[(i,j)] == k+1 for i in range(employee_count)]) >= int(min_val))
-  #7. Break can be only after 3rd hour and before 3rd hour at end. every employee 
+  #7a. Break can be only after 3rd hour and before 3rd hour at end. every employee 
+  #7b. Break can be utmost 1 hour
   for i in range(employee_count):
     pref_start = employees_df.loc[i]['preferredstart']
     print(pref_start)
@@ -76,6 +77,7 @@ def get_optimized_answer(sections_df, employees_df):
     pref_end_idx = sections_df[sections_df['time'] == pref_end].index[0]
     solver.Add(solver.Sum([sections[(i, j)] == 0 for j in range(pref_start_idx, pref_start_idx + BREAK_UNIT)]) == 0)
     solver.Add(solver.Sum([sections[(i, j)] == 0 for j in range(pref_end_idx - BREAK_UNIT, pref_end_idx)]) == 0)
+    solver.Add(solver.Sum([sections[(i, j)] == 0 for j in range(pref_start_idx, pref_end_idx)]) <= MAX_BREAKS)
   #8. Run optimizer
   print("Phasing", solver)
   db = solver.Phase(sections_flat, solver.CHOOSE_FIRST_UNBOUND, solver.ASSIGN_MIN_VALUE)
@@ -91,10 +93,10 @@ def get_optimized_answer(sections_df, employees_df):
   print(employees_df)
   for sol in range(collector.SolutionCount()):
     print("Solution number" , sol, '\n')
-    op = [[collector.Value(sol, sections[(j, i)]) for j in range(employee_count)] for i in range(hours_count)]
-    opindex =  [sections_df.loc[i].time for i in range(hours_count)]
-    opdf = pd.DataFrame(op, index = opindex)
-    opdf.columns = [employees_df.loc[i].employeeid for i in range(employee_count)]
+    op = [[collector.Value(sol, sections[(i, j)]) for j in range(hours_count)] for i in range(employee_count)]
+    opcolumns =  [sections_df.loc[i].time for i in range(hours_count)]
+    opindex   =  [employees_df.loc[i].employeeid for i in range(employee_count)]
+    opdf = pd.DataFrame(op, index = opindex, columns=opcolumns)
     print(opdf) #"Employee", j, "assigned to task",  collector.Value(sol, sections[(j, i)]))
  
 
@@ -112,7 +114,6 @@ def main():
   sedf = sedf.drop(columns = ['index'])
   print(sedf.columns, edf.columns)
   get_optimized_answer(sedf, edf)
-
 
 if __name__ == "__main__":
   main()
