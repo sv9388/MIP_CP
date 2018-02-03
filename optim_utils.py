@@ -37,10 +37,11 @@ def get_optimized_answer(sections_df, employees_df):
       solver.Add(solver.Sum([employees[(j, i, k)].IndexOf(sections_for_houri)==j for k in range(sec_emp_count)])==sec_emp_count)
   #4. Employees work 6 to 8 hours. Doesn't work before start time and doesn't work after end time.
   for j in range(employee_count):
-    pref_start = employees_df.loc[j]['Preferred Start of shift'] 
-    pref_start_idx = sections_df[sections_df['Time'] == pref_start].index[0]
-    pref_end = employees_df.loc[j]['Preferred end of shift']
-    pref_end_idx = sections_df[sections_df['Time'] == pref_end].index[0]
+    pref_start = employees_df.loc[j]['preferredstart']
+    print(pref_start)
+    pref_start_idx = sections_df[sections_df['time'] == pref_start].index[0]
+    pref_end = employees_df.loc[j]['preferredend']
+    pref_end_idx = sections_df[sections_df['time'] == pref_end].index[0]
     print(pref_start, pref_start_idx)
     print(pref_end, pref_end_idx)
     for i in range(pref_start_idx):
@@ -49,7 +50,7 @@ def get_optimized_answer(sections_df, employees_df):
       solver.Add(sections[(j, i)] == 0)
   #5. Employees work only in certified sections
   for j in range(employee_count):
-    certified_sections = employees_df.loc[j]['Section certifications'].split(",")
+    certified_sections = employees_df.loc[j]['sectioncertifications'].split(",")
     certified_sections = [0] + [int(x) for x in certified_sections]
     print(certified_sections)
     for i in range(hours_count):
@@ -88,15 +89,17 @@ def get_optimized_answer(sections_df, employees_df):
 
 def main():
   sdf, edf = get_df()
-  sdf['Section 0'] = 0
-  edf['Preferred Start of shift'] = 9.0
-  edf['Preferred end of shift'] = 12.0
-  edf['earliest available start'] = 8.0
-  edf['latest available end '] = 18.0
-  sedf = sdf.loc[15:25][["Time", "Section 0", "Section 1", "Section 2"]]
+  sdf['section0'] = 0
+  edf['preferredstart'] = 9.0
+  print(sdf['time'])
+  edf['preferredend'] = 12.0
+  edf['earlieststart'] = 8.0
+  edf['latestend'] = 18.0
+  sedf = sdf.iloc[15:25][["time", "section0", "section1", "section2"]]
+  print(sedf)
   sedf = sedf.reset_index()
   sedf = sedf.drop(columns = ['index'])
-  print(sedf)
+  print(sedf.columns, edf.columns)
   get_optimized_answer(sedf, edf)
 
 
