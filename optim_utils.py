@@ -66,7 +66,7 @@ def get_optimized_answer(sections_df, employees_df):
   for j in range(hours_count):
     for k in range(temp_arr.shape[1]):
       min_val = temp_arr[j][k]
-      solver.Add(solver.Sum([ sections[(i,j)] == k+1 for i in range(employee_count)]) >= int(min_val))
+      solver.Add(solver.Sum([ sections[(i,j)] == k+1 for i in range(employee_count)]) == int(min_val))
   #7a. Break can be only after 3rd hour and before 3rd hour at end. every employee
   #7b. Break can be utmost 1 hour
   for i in range(employee_count):
@@ -103,17 +103,7 @@ def get_optimized_answer(sections_df, employees_df):
 def main(sf, ef):
   sdf, edf = get_df(sf, ef)
   sdf['section0'] = 0
-  edf['preferredstart'] = 9.0
-  print(sdf['time'])
-  edf['preferredend'] = 12.0
-  edf['earlieststart'] = 8.0
-  edf['latestend'] = 18.0
-  sedf = sdf.iloc[15:25][["time", "section0", "section1", "section2"]]
-  print(sedf)
-  sedf = sedf.reset_index()
-  sedf = sedf.drop(columns = ['index'])
-  print(sedf.columns, edf.columns)
-  get_optimized_answer(sedf, edf)
+  get_optimized_answer(sdf, edf)
 
 if __name__ == "__main__":
   import argparse
@@ -121,5 +111,5 @@ if __name__ == "__main__":
   parser.add_argument("section")
   parser.add_argument("employee")
   args = parser.parse_args()
-  print(args)
-  main(args['section'], args['employee'])
+  print(args.section, args.employee)
+  main(args.section, args.employee)
