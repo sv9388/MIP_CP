@@ -1,8 +1,8 @@
 import pandas as pd
 from ortools.constraint_solver import pywrapcp
 
-MAX_BREAKS = 1 #TODO: 2
-BREAK_UNIT = 1 #TODO: Six units in actual file
+MAX_BREAKS = 2 #TODO: 2
+BREAK_UNIT = 6 #TODO: Six units in actual file
 
 def get_df():
   section_df = pd.read_csv('./sections.csv') #TODO: Dynamic filenames as ip
@@ -98,7 +98,6 @@ def get_optimized_answer(sections_df, employees_df):
     opindex   =  [employees_df.loc[i].employeeid for i in range(employee_count)]
     opdf = pd.DataFrame(op, index = opindex, columns=opcolumns)
     print(opdf) #"Employee", j, "assigned to task",  collector.Value(sol, sections[(j, i)]))
- 
 
 def main():
   sdf, edf = get_df()
@@ -108,12 +107,12 @@ def main():
   edf['preferredend'] = 12.0
   edf['earlieststart'] = 8.0
   edf['latestend'] = 18.0
-  sedf = sdf.iloc[15:25][["time", "section0", "section1", "section2"]]
-  print(sedf)
-  sedf = sedf.reset_index()
-  sedf = sedf.drop(columns = ['index'])
-  print(sedf.columns, edf.columns)
-  get_optimized_answer(sedf, edf)
+  #sedf = sdf.iloc[15:25][["time", "section0", "section1", "section2"]]
+  #print(sedf)
+  #sedf = sedf.reset_index()
+  #sedf = sedf.drop(columns = ['index'])
+  print(sdf.columns, edf.columns)
+  get_optimized_answer(sdf, edf)
 
 if __name__ == "__main__":
   main()
