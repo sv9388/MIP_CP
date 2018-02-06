@@ -4,15 +4,15 @@ from ortools.constraint_solver import pywrapcp
 MAX_BREAKS = 1 #TODO: 2
 BREAK_UNIT = 1 #TODO: Six units in actual file
 
-def get_df():
-  section_df = pd.read_csv('./sections.csv') #TODO: Dynamic filenames as ip
-  employees_df = pd.read_csv('./employees.csv')
+def get_df(sf, ef):
+  section_df = pd.read_csv(sf) #TODO: Dynamic filenames as ip
+  employees_df = pd.read_csv(ef)
   return section_df, employees_df
 
 # meet all requirements per section at minimum labour-hours
 def get_optimized_answer(sections_df, employees_df):
   #0. Variables
-  section_count = sections_df.shape[1]-1 
+  section_count = sections_df.shape[1]-1
   employee_count = employees_df.shape[0]
   hours_count = sections_df.shape[0]
   solver = pywrapcp.Solver("schedule_sections")
@@ -67,7 +67,7 @@ def get_optimized_answer(sections_df, employees_df):
     for k in range(temp_arr.shape[1]):
       min_val = temp_arr[j][k]
       solver.Add(solver.Sum([ sections[(i,j)] == k+1 for i in range(employee_count)]) >= int(min_val))
-  #7a. Break can be only after 3rd hour and before 3rd hour at end. every employee 
+  #7a. Break can be only after 3rd hour and before 3rd hour at end. every employee
   #7b. Break can be utmost 1 hour
   for i in range(employee_count):
     pref_start = employees_df.loc[i]['preferredstart']
@@ -98,10 +98,10 @@ def get_optimized_answer(sections_df, employees_df):
     opindex   =  [employees_df.loc[i].employeeid for i in range(employee_count)]
     opdf = pd.DataFrame(op, index = opindex, columns=opcolumns)
     print(opdf) #"Employee", j, "assigned to task",  collector.Value(sol, sections[(j, i)]))
- 
 
-def main():
-  sdf, edf = get_df()
+
+def main(sf, ef):
+  sdf, edf = get_df(sf, ef)
   sdf['section0'] = 0
   edf['preferredstart'] = 9.0
   print(sdf['time'])
@@ -116,4 +116,10 @@ def main():
   get_optimized_answer(sedf, edf)
 
 if __name__ == "__main__":
-  main()
+  import argparse
+  parser = argparse.ArgumentParser()
+  parser.add_argument("section")
+  parser.add_argument("employee")
+  args = parser.parse_args()
+  print(args)
+  main(args['section'], args['employee'])
