@@ -115,4 +115,10 @@ def main():
   get_optimized_answer(sdf, edf)
 
 if __name__ == "__main__":
+  import argparse
+  parser = argparse.ArgumentParser()
+  parser.add_argument("section")
+  parser.add_argument("employee")
+  args = parser.parse_args()
+  print(args)
   main()
