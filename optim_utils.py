@@ -4,9 +4,9 @@ from ortools.constraint_solver import pywrapcp
 MAX_BREAKS = 2 #TODO: 2
 BREAK_UNIT = 6 #TODO: Six units in actual file
 
-def get_df():
-  section_df = pd.read_csv('./sections.csv') #TODO: Dynamic filenames as ip
-  employees_df = pd.read_csv('./employees.csv')
+def get_df(sf, ef):
+  section_df = pd.read_csv(sf) #'./sections.csv') #TODO: Dynamic filenames as ip
+  employees_df = pd.read_csv(ef)# './employees.csv')
   return section_df, employees_df
 
 # meet all requirements per section at minimum labour-hours
@@ -99,8 +99,8 @@ def get_optimized_answer(sections_df, employees_df):
     opdf = pd.DataFrame(op, index = opindex, columns=opcolumns)
     print(opdf) #"Employee", j, "assigned to task",  collector.Value(sol, sections[(j, i)]))
 
-def main():
-  sdf, edf = get_df()
+def main(sf, ef):
+  sdf, edf = get_df(sf, ef)
   sdf['section0'] = 0
   edf['preferredstart'] = 9.0
   print(sdf['time'])
