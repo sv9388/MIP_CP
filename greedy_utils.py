@@ -1,4 +1,4 @@
-import pandas as pd
+import pandas as pd, time
 from ortools.constraint_solver import pywrapcp
 
 MAX_BREAKS = 2
@@ -15,44 +15,53 @@ _ = """employees = N, sections = 6 (5 + 1)
 assign different employees to sections  (dynamic sized array)
 employees start >= current hour employees end <= current hour
 section id in certified sections array #TODO"""
-
 def get_optimized_answer(arr, tdf):
     solver = pywrapcp.Solver("schedule_sections")
     employees = {}
     employees_flat = []
     for i in range(len(arr)):
         for j in range(arr[i]):
-            employees[(i, j)] = solver.IntVar(0, tdf.shape[0], "employees(%i,%i)" % (i, j))
+            employees[(i, j)] = solver.IntVar(1,1+ tdf.shape[0], "employees(%i,%i)" % (i, j))
             employees_flat.append(employees[(i, j)])
-    print("Variables Count = ", len(employees_flat))
-    print(arr)
     for i in range(len(arr)):
         solver.Add(solver.AllDifferent(employees_flat)) #for j in range(arr[i])]))
-    for i in range(len(arr)):
-        pass
     db = solver.Phase(employees_flat, solver.CHOOSE_FIRST_UNBOUND, solver.ASSIGN_RANDOM_VALUE)
     solution = solver.Assignment()
     solution.Add(employees_flat)
     collector = solver.FirstSolutionCollector(solution)
-    print("Solving", solver, solution)
     solver.Solve(db, [collector])
-    print("Solutions found:", collector.SolutionCount())
-    print("Time:", solver.WallTime(), "ms")
-    print()
     op = []
     for sol in range(collector.SolutionCount()):
         op = [[ collector.Value(sol, employees[(i,j)]) for j in range(arr[i])] for i in range(len(arr))]
     return op
 
 def main(sf, ef):
+  start = time.time()
+  print("Started at", start)
   sdf, edf = get_df(sf, ef)
   sdf['section0'] = 0
   scolumns = ['section1', 'section2', 'section3', 'section4', 'section5']
+  row_section = lambda i : [int(x) for x in sdf.loc[i][scolumns].as_matrix().tolist()]
+
   op = []
-  for h in sdf.time:
-    op.append(get_optimized_answer(sdf.loc[sdf.time == h][scolumns].as_matrix()[0], edf[(edf.preferredstart <= h) & ( h <= edf.preferredend)]))
+  strict_timings = []
+  for i in range(sdf.shape[0]):
+    op.append(("PREFER", row_section(i), get_optimized_answer(row_section(i), edf[(edf.preferredstart <= sdf.loc[i].time) & ( sdf.loc[i].time <= edf.preferredend)])))
+  processed = time.time()
+  print("Preferred Solution found in ", processed - start, "seconds")
+  for i in range(len(op)):
+    if len(op[i][-1]) == 0:
+      strict_timings.append(i)
+  for i in strict_timings:
+    op[i] = ("STRICT", row_section(i), get_optimized_answer(row_section(i), edf[(edf.earlieststart<= sdf.loc[i].time) & (sdf.loc[i].time <= edf.latestend)]))
+  print("Strict solution found in", time.time() - start, "seconds")
+  for i in range(len(op)):
+    if len(op[i][-1]) == 0:
+      op[i] = ("NOSOL", None)
+
   for x in op:
     print(x)
+  print("Total Time", time.time() - start, "seconds")
 
 if __name__ == "__main__":
   import argparse
