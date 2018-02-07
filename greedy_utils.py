@@ -57,10 +57,10 @@ def main(sf, ef):
   print("Strict solution found in", time.time() - start, "seconds")
   for i in range(len(op)):
     if len(op[i][-1]) == 0:
-      op[i] = ("NOSOL", None)
+      op[i] = ("NOSOL", row_section(i), None)
 
-  for x in op:
-    print(x)
+  for i in range(len(op)):
+    print(i, ": ", op[i])
   print("Total Time", time.time() - start, "seconds")
 
 if __name__ == "__main__":
