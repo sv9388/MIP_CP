@@ -27,10 +27,10 @@ def get_optimized_answer(arr, tdf):
     print("Variables Count = ", len(employees_flat))
     print(arr)
     for i in range(len(arr)):
-        solver.Add(solver.AllDifferent([employees[(i, j)] for j in range(arr[i])]))
+        solver.Add(solver.AllDifferent(employees_flat)) #for j in range(arr[i])]))
     for i in range(len(arr)):
         pass
-    db = solver.Phase(employees_flat, solver.CHOOSE_FIRST_UNBOUND, solver.ASSIGN_MIN_VALUE)
+    db = solver.Phase(employees_flat, solver.CHOOSE_FIRST_UNBOUND, solver.ASSIGN_RANDOM_VALUE)
     solution = solver.Assignment()
     solution.Add(employees_flat)
     collector = solver.FirstSolutionCollector(solution)
@@ -39,18 +39,20 @@ def get_optimized_answer(arr, tdf):
     print("Solutions found:", collector.SolutionCount())
     print("Time:", solver.WallTime(), "ms")
     print()
+    op = []
     for sol in range(collector.SolutionCount()):
-        print("Solution number" , sol, '\n')
-        for i in range(len(arr)):
-            for j in range(arr[i]):
-                print(collector.Value(sol, employees[i][j]))
+        op = [[ collector.Value(sol, employees[(i,j)]) for j in range(arr[i])] for i in range(len(arr))]
+    return op
 
 def main(sf, ef):
   sdf, edf = get_df(sf, ef)
   sdf['section0'] = 0
   scolumns = ['section1', 'section2', 'section3', 'section4', 'section5']
-  h = 9.5
-  get_optimized_answer(sdf.loc[sdf.time == h][scolumns].as_matrix()[0], edf[(edf.preferredstart <= h) & ( h <= edf.preferredend)])
+  op = []
+  for h in sdf.time:
+    op.append(get_optimized_answer(sdf.loc[sdf.time == h][scolumns].as_matrix()[0], edf[(edf.preferredstart <= h) & ( h <= edf.preferredend)]))
+  for x in op:
+    print(x)
 
 if __name__ == "__main__":
   import argparse
