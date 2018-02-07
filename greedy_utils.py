@@ -28,11 +28,12 @@ def get_optimized_answer(arr, tdf):
     print(arr)
     for i in range(len(arr)):
         solver.Add(solver.AllDifferent([employees[(i, j)] for j in range(arr[i])]))
-    solver.SolutionsLimit(2)
+    for i in range(len(arr)):
+        pass
     db = solver.Phase(employees_flat, solver.CHOOSE_FIRST_UNBOUND, solver.ASSIGN_MIN_VALUE)
     solution = solver.Assignment()
     solution.Add(employees_flat)
-    collector = solver.AllSolutionCollector(solution)
+    collector = solver.FirstSolutionCollector(solution)
     print("Solving", solver, solution)
     solver.Solve(db, [collector])
     print("Solutions found:", collector.SolutionCount())
