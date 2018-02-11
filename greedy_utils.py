@@ -1,4 +1,4 @@
-import pandas as pd, time
+import pandas as pd, numpy as np, time
 from ortools.constraint_solver import pywrapcp
 
 MAX_BREAKS = 2
@@ -59,9 +59,21 @@ def main(sf, ef):
     if len(op[i][-1]) == 0:
       op[i] = ("NOSOL", row_section(i), None)
 
-  for i in range(len(op)):
-    print(i, ": ", op[i])
-  print("Total Time", time.time() - start, "seconds")
+  arrop = [[-1 for i in range(sdf.shape[0])]for j in range(edf.shape[0])]
+  for h in range(len(op)):
+   
+    if op[h][0] == "NOSOL":
+      continue
+    d = op[h][2]
+    print(d)
+    for s in range(5):
+      for e in d[s]:
+        print(len(arrop), len(arrop[0]), e, h)
+        arrop[e-1][h] = s
+
+  op = pd.DataFrame(arrop)
+  op.to_csv("./op.csv")
+
 
 if __name__ == "__main__":
   import argparse
