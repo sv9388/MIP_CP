@@ -10,42 +10,7 @@ def get_df(sf, ef):
   employees_df = pd.read_csv(ef)
   return section_df, employees_df
 
-def l2_optimization(eprefs, ecerts):
-  # nbop = employee vs hour matrix
-  # sdf = hour x section matrix minreq
-  # eprefs = break valid range
-  # cost array is available employees per section per hr vs sdf
-  employee_count = eprefs.shape[0]
-  hour_count = sdf.shape[0]
-  solver = pywrapcp.Solver("schedule_breaks", pywraplp.Solver.CBC_MIXED_INTEGER_PROGRAMMING)
-  breaks = {}
-  for i in range(employee_count):
-    for j in range(hour_count):
-      breaks[(i, j)] = solver.BoolVar('x[%i,%i]'  % (i, j))
-  print(len(breaks))
-  # breaks per employee exactly = 2
-  for i in range(employee_count):
-    si = eprefs[eprefs.preferredstart] * HOUR_UNIT + BREAK_UNIT
-    ei = eprefs[eprefs.preferredend] * HOUR_UNIT - BREAK_UNIT
-    solver.Add(Solver.Sum([ breaks[(i, j)] for j in range(si, ei+1) ]) == 2)
-    solver.Add(Solver.Sum([ breaks[(i, j)] for j in range(0, si)]) == 0)
-    solver.Add(Solver.Sum([ breaks[(i, j)] for j in range(ei+1, hour_count)]) == 0)
-  # Breaks per employee should be within eprefs
-  # if there is a break by 1 employee, another employee in this cs
-
 scolumns = ['section1', 'section2', 'section3', 'section4', 'section5']
-def process_breaks(op, reqop, bestart, beend, becerts): 
-  arr = np.array(op)
-  print(arr.shape, reqop.shape, bestart.shape, beend.shape) #(49, 52) (49, 5) (52, 2)
-  # 1. Get all employees ph who are free, including their break times. 2. Get all employees ph who require break. If 2 > 1 fe section,  no solution.
-  _ = """>>> for i in range(op.shape[1]):
-...     u, c = np.unique(op[:, i], return_counts = True)
-...     d = dict(zip(u, c))
-...     a = [d[x] if x in d else 0 for x in range(1, 6)]
-...     print(a, s.loc[i].as_matrix())
-...
-"""  
-  return op, True 
  
 def get_optimized_answer(arr, emp_indices, ecerts):
   # arr = 1D arr of min section requirement per hour
@@ -99,10 +64,16 @@ def ans_row(sdf, edf, ecols, invalid_hours = None, existing_op = None):
   df = pd.DataFrame(op)
   print(df.shape)
   print(solfound)
+
   if solfound:
-    # Fill zeroes with certified sc
-    op = np.array(op)
-    
+    # Fill non working assignments with filled except 2 zeroes
+    op = np.array(op).transpose().tolist()
+    for i in range(len(op)):
+      print("Existing row: ", op[i])
+      for j in range(1, edf.loc[i][eecol]*2):
+        if op[i][j] == 0 and op[i][j-1]>0:
+          op[i][j] = op[i][j-1]
+      print("Modified row: ", op[i])    
   _ = """if solfound:
     op, solfound = process_breaks(op, sdf[scolumns].as_matrix(), edf[secol] * HOUR_UNIT + BREAK_UNIT, edf[eecol] * HOUR_UNIT - BREAK_UNIT, edf.sectioncertifications)"""
   return op, pi_idx, solfound
