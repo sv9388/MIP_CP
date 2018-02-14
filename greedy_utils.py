@@ -40,6 +40,24 @@ def get_optimized_answer(arr, emp_indices, ecerts):
   solver.EndSearch()
   return op, solfound
 
+def fill_free_hours(op, edf, tot_hours, ecols):
+  secol, eecol = ecols
+  filled = np.transpose(op)
+  free_employees = np.where(np.all(filled == 0, axis = 1))
+  print(free_employees)
+  enw = [[ False for h in range(tot_hours) ] for i in range(edf.shape[0])]
+  for i in range(filled.shape[0]):
+    idx = np.where(filled[i] > 0)[0][0] if np.where(filled[i] > 0)[0].size > 0 else 1
+    for j in range(edf.loc[i][secol], idx):
+      enw[i][j] = True
+      filled[i][j] = filled[i][idx]
+    for j in range(idx, edf.loc[i][eecol]*2):
+      if filled[i][j] == 0 and filled[i][j-1]>0:
+        enw[i][j] = True
+        filled[i][j] = filled[i][j-1]
+   
+  return filled, enw, free_employees
+   
 def ans_row(sdf, edf, ecols, invalid_hours = None, existing_op = None):
   secol, eecol = ecols
   op =  existing_op if existing_op else [[0 for  i in range(edf.shape[0])] for  j in range(sdf.shape[0])]
@@ -64,18 +82,8 @@ def ans_row(sdf, edf, ecols, invalid_hours = None, existing_op = None):
   df = pd.DataFrame(op)
   print(df.shape)
   print(solfound)
-
   if solfound:
-    # Fill non working assignments with filled except 2 zeroes
-    op = np.array(op).transpose().tolist()
-    for i in range(len(op)):
-      print("Existing row: ", op[i])
-      for j in range(1, edf.loc[i][eecol]*2):
-        if op[i][j] == 0 and op[i][j-1]>0:
-          op[i][j] = op[i][j-1]
-      print("Modified row: ", op[i])    
-  _ = """if solfound:
-    op, solfound = process_breaks(op, sdf[scolumns].as_matrix(), edf[secol] * HOUR_UNIT + BREAK_UNIT, edf[eecol] * HOUR_UNIT - BREAK_UNIT, edf.sectioncertifications)"""
+    op, enw, free_employees = fill_free_hours(op, edf, sdf.shape[0], ecols)
   return op, pi_idx, solfound
 
 def main(sf, ef):
