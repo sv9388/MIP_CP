@@ -2,80 +2,124 @@ import pandas as pd, numpy as np, time
 from ortools.constraint_solver import pywrapcp
 
 MAX_BREAKS = 2
-BREAK_UNIT = 6
+BREAK_UNIT = 4
+HOUR_UNIT = 2 # How many hour slices make an hour?
 
 def get_df(sf, ef):
   section_df = pd.read_csv(sf)
   employees_df = pd.read_csv(ef)
   return section_df, employees_df
 
-# meet all requirements per section at minimum labour-hours
+def l2_optimization(eprefs, ecerts):
+  # nbop = employee vs hour matrix
+  # sdf = hour x section matrix minreq
+  # eprefs = break valid range
+  # cost array is available employees per section per hr vs sdf
+  employee_count = eprefs.shape[0]
+  hour_count = sdf.shape[0]
+  solver = pywrapcp.Solver("schedule_breaks", pywraplp.Solver.CBC_MIXED_INTEGER_PROGRAMMING)
+  breaks = {}
+  for i in range(employee_count):
+    for j in range(hour_count):
+      breaks[(i, j)] = solver.BoolVar('x[%i,%i]'  % (i, j))
+  print(len(breaks))
+  # breaks per employee exactly = 2
+  for i in range(employee_count):
+    si = eprefs[eprefs.preferredstart] * HOUR_UNIT + BREAK_UNIT
+    ei = eprefs[eprefs.preferredend] * HOUR_UNIT - BREAK_UNIT
+    solver.Add(Solver.Sum([ breaks[(i, j)] for j in range(si, ei+1) ]) == 2)
+    solver.Add(Solver.Sum([ breaks[(i, j)] for j in range(0, si)]) == 0)
+    solver.Add(Solver.Sum([ breaks[(i, j)] for j in range(ei+1, hour_count)]) == 0)
+  # Breaks per employee should be within eprefs
+  # if there is a break by 1 employee, another employee in this cs
 
-_ = """employees = N, sections = 6 (5 + 1)
-assign different employees to sections  (dynamic sized array)
-employees start >= current hour employees end <= current hour
-section id in certified sections array #TODO"""
-def get_optimized_answer(arr, tdf):
-    solver = pywrapcp.Solver("schedule_sections")
-    employees = {}
-    employees_flat = []
-    for i in range(len(arr)):
-        for j in range(arr[i]):
-            employees[(i, j)] = solver.IntVar(1,1+ tdf.shape[0], "employees(%i,%i)" % (i, j))
-            employees_flat.append(employees[(i, j)])
-    for i in range(len(arr)):
-        solver.Add(solver.AllDifferent(employees_flat)) #for j in range(arr[i])]))
-    db = solver.Phase(employees_flat, solver.CHOOSE_FIRST_UNBOUND, solver.ASSIGN_RANDOM_VALUE)
-    solution = solver.Assignment()
-    solution.Add(employees_flat)
-    collector = solver.FirstSolutionCollector(solution)
-    solver.Solve(db, [collector])
-    op = []
-    for sol in range(collector.SolutionCount()):
-        op = [[ collector.Value(sol, employees[(i,j)]) for j in range(arr[i])] for i in range(len(arr))]
-    return op
+scolumns = ['section1', 'section2', 'section3', 'section4', 'section5']
+def process_breaks(op, reqop, bestart, beend, becerts): 
+  arr = np.array(op)
+  print(arr.shape, reqop.shape, bestart.shape, beend.shape) #(49, 52) (49, 5) (52, 2)
+  # 1. Get all employees ph who are free, including their break times. 2. Get all employees ph who require break. If 2 > 1 fe section,  no solution.
+  _ = """>>> for i in range(op.shape[1]):
+...     u, c = np.unique(op[:, i], return_counts = True)
+...     d = dict(zip(u, c))
+...     a = [d[x] if x in d else 0 for x in range(1, 6)]
+...     print(a, s.loc[i].as_matrix())
+...
+"""  
+  return op, True 
+ 
+def get_optimized_answer(arr, emp_indices, ecerts):
+  # arr = 1D arr of min section requirement per hour
+  # emp_indices = employee df with times as indices in arr
+  op = [0 for i in range(len(emp_indices))]
+  solfound = (sum(arr) == 0)
+  if len(emp_indices) == 0 or sum(arr) == 0:
+    return op, solfound
+  solver = pywrapcp.Solver("schedule_sections")
+  employee_count = len(emp_indices)
+  section_count = len(arr) + 1 
+  sections = [solver.IntVar(0, section_count-1, "sections(%i)" % i) for i in range(employee_count)]
+  # 1. An employee must be in certified section only
+  for i in range(employee_count):
+    empcerts = ecerts[i].split(",")
+    empcerts = list([0] + [int(x) for x in empcerts])
+    solver.Add(solver.Sum([solver.IsMemberVar(sections[i], empcerts)]) == 1)
+  # 2. Total section requirement should be met.  
+  for i in range(1, section_count):
+    solver.Add(solver.Sum([sections[j] == i for j in range(employee_count) ]) == int(arr[i-1]))
+  # Optimiser
+  db = solver.Phase(sections, solver.CHOOSE_FIRST_UNBOUND, solver.ASSIGN_RANDOM_VALUE  )  
+  solver.NewSearch(db) #, [solver.SearchTrace("")])
+  if solver.NextSolution():
+    solfound = True
+    op = [sections[i].Value() for i in range(employee_count)]
+  solver.EndSearch()
+  return op, solfound
+
+def ans_row(sdf, edf, ecols, invalid_hours = None, existing_op = None):
+  secol, eecol = ecols
+  op =  existing_op if existing_op else [[0 for  i in range(edf.shape[0])] for  j in range(sdf.shape[0])]
+  indices = invalid_hours if invalid_hours else range(sdf.shape[0])
+  pi_idx = []
+  row_section = lambda i : [int(x) for x in sdf.loc[i][scolumns].as_matrix().tolist()]
+  solfound = True
+  for i in indices: 
+    r = row_section(i)
+    emps = edf[(edf[secol]<= sdf.loc[i].time) & (sdf.loc[i].time <= edf[eecol])]
+    eidx = list(emps.index)
+    asgn = [0 for j in range(edf.shape[0])]
+    certs = emps.sectioncertifications.as_matrix()
+    svals, t = get_optimized_answer(r, eidx, certs)
+    if not t:
+      pi_idx.append(i)
+    solfound = solfound & t
+    for j in range(len(eidx)):
+      idx = eidx[j]
+      asgn[idx] = svals[j]
+    op[i] = asgn
+  df = pd.DataFrame(op)
+  print(df.shape)
+  print(solfound)
+  if solfound:
+    # Fill zeroes with certified sc
+    op = np.array(op)
+    
+  _ = """if solfound:
+    op, solfound = process_breaks(op, sdf[scolumns].as_matrix(), edf[secol] * HOUR_UNIT + BREAK_UNIT, edf[eecol] * HOUR_UNIT - BREAK_UNIT, edf.sectioncertifications)"""
+  return op, pi_idx, solfound
 
 def main(sf, ef):
-  start = time.time()
-  print("Started at", start)
   sdf, edf = get_df(sf, ef)
-  sdf['section0'] = 0
-  scolumns = ['section1', 'section2', 'section3', 'section4', 'section5']
-  row_section = lambda i : [int(x) for x in sdf.loc[i][scolumns].as_matrix().tolist()]
-
-  op = []
-  strict_timings = []
-  for i in range(sdf.shape[0]):
-    op.append(("PREFER", row_section(i), get_optimized_answer(row_section(i), edf[(edf.preferredstart <= sdf.loc[i].time) & ( sdf.loc[i].time <= edf.preferredend)])))
-  processed = time.time()
-  print("Preferred Solution found in ", processed - start, "seconds")
-  for i in range(len(op)):
-    if len(op[i][-1]) == 0:
-      strict_timings.append(i)
-  for i in strict_timings:
-    op[i] = ("STRICT", row_section(i), get_optimized_answer(row_section(i), edf[(edf.earlieststart<= sdf.loc[i].time) & (sdf.loc[i].time <= edf.latestend)]))
-  print("Strict solution found in", time.time() - start, "seconds")
-  for i in range(len(op)):
-    if len(op[i][-1]) == 0:
-      op[i] = ("NOSOL", row_section(i), None)
-
-  arrop = [[-1 for i in range(sdf.shape[0])]for j in range(edf.shape[0])]
-  for h in range(len(op)):
-   
-    if op[h][0] == "NOSOL":
-      continue
-    d = op[h][2]
-    print(d)
-    for s in range(5):
-      for e in d[s]:
-        print(len(arrop), len(arrop[0]), e, h)
-        arrop[e-1][h] = s
-
-  op = pd.DataFrame(arrop)
-  op.to_csv("./op.csv")
-
+  op1, invalid_hours, solfound = ans_row(sdf, edf, ["preferredstart", "preferredend"], None, None)
+  print(invalid_hours)
+  pd.DataFrame(op1).to_csv("./prefop.csv")
+  if not solfound:
+    print("############################################################################################################################################")
+    op2, invalid_hours, solfound = ans_row(sdf, edf, ["earlieststart", "latestend"], invalid_hours, op1)
+    print(invalid_hours)  
+    pd.DataFrame(op2).to_csv("./strictop1.csv")
 
 if __name__ == "__main__":
+  start = time.time()
   import argparse
   parser = argparse.ArgumentParser()
   parser.add_argument("section")
@@ -83,3 +127,4 @@ if __name__ == "__main__":
   args = parser.parse_args()
   print(args.section, args.employee)
   main(args.section, args.employee)
+  print("TOtal time = ", time.time() - start)
